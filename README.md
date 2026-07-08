@@ -28,19 +28,18 @@ needledrop does the same job with a single program and nothing installed on the 
 
 You need Python 3.11 or newer.
 
-It is not on PyPI yet, so for now install from a checkout:
-
-```bash
-git clone https://github.com/justintevya/needledrop && cd needledrop
-python -m venv .venv && . .venv/bin/activate
-pip install .
-needledrop setup                  # asks which adapter and which rooms, writes the config
-```
-
-Once there is a PyPI release, the whole thing will be:
+The short version:
 
 ```bash
 uv tool install needledrop        # or: pipx install needledrop
+needledrop setup                  # asks which adapter and which rooms, writes the config
+```
+
+Plain pip works too, in a venv if you prefer:
+
+```bash
+python -m venv .venv && . .venv/bin/activate
+pip install needledrop
 needledrop setup
 ```
 
