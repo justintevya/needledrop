@@ -7,8 +7,10 @@ from needledrop.devices import list_cards as real_list_cards
 
 
 def test_version_command(capsys):
+    from needledrop import __version__
+
     assert main(["version"]) == 0
-    assert "0.1.0" in capsys.readouterr().out
+    assert __version__ in capsys.readouterr().out
 
 
 class FakeZone:
