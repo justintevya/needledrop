@@ -1,0 +1,25 @@
+# needledrop example configuration
+# Copy to ~/.config/needledrop/config.yaml (or /etc/needledrop/config.yaml)
+# and edit. No secrets belong in this file - Sonos needs no credentials.
+
+audio:
+  # USB device identity: VID:PID (see `lsusb`), with ALSA card-name fallback.
+  device: { usb_id: "08bb:2902", card_name: "CODEC" }
+  sample_rate: 44100          # fixed - MP3 CBR 320 @ 44.1kHz stereo
+
+detect:
+  highpass_hz: 40             # high-pass filter to reject turntable rumble
+  music_on_db: -45.0          # smoothed RMS above this = music (needle dropped)
+  music_off_db: -55.0         # smoothed RMS below this = silence (hysteresis)
+  start_debounce_s: 2         # music must sustain this long before playback starts
+  end_of_side_s: 240          # grace period of silence before Sonos stops
+
+# port = dashboard/API/websocket; the MP3 stream itself runs on port + 1
+stream: { port: 8341, bitrate: 320 }   # bitrate must be 128/192/256/320
+
+sonos:
+  vinyl_zones: [Living Room, Dining Room, Office, Playroom]
+  preferred_coordinator: Living Room   # pulls the stream and redistributes to
+                                       # the group - pick a wired/newest player
+  dont_interrupt_busy: true   # skip zones already playing something else
+  master_volume: null         # null = leave volumes alone (restored on stop)

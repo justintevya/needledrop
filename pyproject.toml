@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "needledrop"
+version = "0.1.0"
+description = "Drop the needle - your Sonos speakers play your turntable, house-wide."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Justin Finkelstein" }]
+keywords = ["vinyl", "sonos", "turntable", "streaming", "icecast", "audio"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Web Environment",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Multimedia :: Sound/Audio :: Capture/Recording",
+]
+dependencies = ["aiohttp>=3.9", "sounddevice>=0.4.6", "lameenc>=1.7", "soco>=0.30", "PyYAML>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.4"]
+
+[project.scripts]
+needledrop = "needledrop.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/justintevya/needledrop"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/needledrop"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# Physics spike kept verbatim as it ran live on hardware - not production code.
+"scripts/spike_stream.py" = ["E4", "E5", "E7"]

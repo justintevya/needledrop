@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>needledrop</title>
+<style>
+:root{
+  --bg:#141210; --panel:#1d1a16; --panel-2:#242019; --edge:#332d24;
+  --amber:#e8a13c; --amber-dim:#7a5a28; --green:#79b884;
+  --text:#d9d2c4; --dim:#8d8577; --faint:#5c564b; --danger:#c96b5a;
+  --radius:10px;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#e9e4da; --panel:#f2eee5; --panel-2:#e2dccf; --edge:#c9c0af;
+    --amber:#b5741a; --amber-dim:#d9b478; --green:#3d7a4c;
+    --text:#2c2822; --dim:#6d6558; --faint:#a29a8a; --danger:#a8442f;
+  }
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html{font-size:16px}
+body{
+  background:var(--bg); color:var(--text); min-height:100vh;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  line-height:1.45;
+  background-image:radial-gradient(ellipse 120% 60% at 50% -10%, rgba(232,161,60,.05), transparent 60%);
+}
+button{font:inherit; color:inherit; background:none; border:0; cursor:pointer}
+:focus-visible{outline:2px solid var(--amber); outline-offset:2px; border-radius:4px}
+.num{font-variant-numeric:tabular-nums}
+.lbl{
+  font-size:.64rem; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--dim); font-weight:600;
+}
+
+/* ---------- header: faceplate with groove texture ---------- */
+header{
+  display:flex; align-items:baseline; gap:.75rem; padding:.9rem 1.1rem .8rem;
+  border-bottom:1px solid var(--edge);
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.014) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
+}
+header h1{font-size:1.05rem; font-weight:650; letter-spacing:.04em}
+header h1 .drop{color:var(--amber)}
+header .tag{font-size:.68rem; letter-spacing:.18em; text-transform:uppercase; color:var(--faint)}
+#gearBtn{
+  margin-left:auto; width:38px; height:38px; border-radius:50%;
+  display:grid; place-items:center; color:var(--dim);
+  border:1px solid var(--edge); background:var(--panel);
+}
+#gearBtn:hover{color:var(--amber); border-color:var(--amber-dim)}
+
+/* ---------- layout ---------- */
+main{max-width:1080px; margin:0 auto; padding:1rem; display:grid; gap:1rem}
+@media (min-width:900px){
+  main{grid-template-columns:minmax(0,3fr) minmax(280px,2fr); align-items:start}
+}
+.panel{
+  background:linear-gradient(180deg, var(--panel-2), var(--panel));
+  border:1px solid var(--edge); border-radius:var(--radius);
+}
+
+/* ---------- state banner ---------- */
+#banner{
+  padding:1.6rem 1.4rem; min-height:128px;
+  display:flex; align-items:center; gap:1.2rem;
+}
+#banner .phase{font-size:.7rem; letter-spacing:.28em; text-transform:uppercase; color:var(--dim); margin-bottom:.3rem}
+#banner .headline{font-size:1.5rem; font-weight:600; letter-spacing:.01em}
+#banner.idle .headline{color:var(--dim); font-weight:400}
+#banner.sensing .phase{color:var(--amber)}
+#banner.sensing .headline{color:var(--amber); animation:pulse 2.2s ease-in-out infinite}
+#banner.playing .phase{color:var(--green)}
+#banner.grace .phase{color:var(--amber)}
+@keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important}
+}
+.clock{font-size:2rem; font-weight:600; color:var(--green)}
+/* spinning record */
+.record{
+  width:64px; height:64px; border-radius:50%; flex:none; position:relative;
+  background:
+    radial-gradient(circle, #ddd0b4 0 17%, #171411 17% 100%),
+    #171411;
+  box-shadow:inset 0 0 0 1px #000, 0 0 0 1px var(--edge);
+  animation:spin 1.8s linear infinite;
+}
+.record::before{ /* grooves */
+  content:""; position:absolute; inset:6px; border-radius:50%;
+  background:repeating-radial-gradient(circle, transparent 0 2px, rgba(255,255,255,.05) 2px 3px);
+  -webkit-mask:radial-gradient(circle, transparent 0 30%, #000 30%);
+          mask:radial-gradient(circle, transparent 0 30%, #000 30%);
+}
+.record::after{ /* offset dot on the label so rotation reads */
+  content:""; position:absolute; top:50%; left:50%; width:5px; height:5px;
+  border-radius:50%; background:var(--amber);
+  transform:translate(3px,-9px);
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* grace ring */
+.ring{flex:none}
+.ring circle.track{stroke:var(--edge); fill:none}
+.ring circle.arc{stroke:var(--amber); fill:none; stroke-linecap:round;
+  transform:rotate(-90deg); transform-origin:50% 50%; transition:stroke-dashoffset .9s linear}
+.ring text{fill:var(--text); font-size:15px; font-weight:600; font-variant-numeric:tabular-nums}
+.keep{
+  margin-top:.55rem; padding:.5rem 1.1rem; border-radius:999px;
+  border:1px solid var(--amber); color:var(--amber); font-weight:600; letter-spacing:.05em;
+}
+.keep:hover{background:rgba(232,161,60,.12)}
+
+/* ---------- VU meter ---------- */
+#vuWrap{padding:.9rem 1rem 1rem}
+#vuWrap .lbl{display:flex; justify-content:space-between; margin-bottom:.5rem}
+#vuDb{color:var(--amber)}
+canvas#vu{display:block; width:100%; height:104px}
+
+/* ---------- zones ---------- */
+#zonesWrap{padding:1rem}
+#zonesWrap > .lbl{margin-bottom:.7rem}
+.master{display:flex; align-items:center; gap:.7rem; margin-bottom:.9rem}
+.master .lbl{flex:none}
+input[type=range]{
+  -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:2px;
+  background:var(--edge); accent-color:var(--amber);
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%;
+  background:var(--amber); border:2px solid var(--bg); cursor:pointer;
+}
+input[type=range]::-moz-range-thumb{
+  width:14px; height:14px; border-radius:50%; background:var(--amber); border:2px solid var(--bg); cursor:pointer;
+}
+.chip{
+  border:1px solid var(--edge); border-left:3px solid var(--edge);
+  border-radius:8px; background:var(--panel-2);
+  margin-bottom:.55rem; overflow:hidden;
+}
+.chip.grouped{border-left-color:var(--amber)}
+.chip.dim .head{opacity:.5}
+.chip .head{
+  width:100%; display:flex; align-items:center; gap:.6rem; padding:.65rem .8rem;
+  text-align:left;
+}
+.chip .name{font-weight:600; font-size:.95rem}
+.chip .vol{margin-left:auto; color:var(--dim); font-size:.8rem}
+.badge{
+  font-size:.6rem; letter-spacing:.14em; text-transform:uppercase;
+  padding:.15rem .5rem; border-radius:999px;
+  border:1px solid var(--faint); color:var(--dim);
+}
+.badge.warn{border-color:var(--danger); color:var(--danger)}
+.chip .slide{display:none; padding:.15rem .9rem .8rem}
+.chip.open .slide{display:block}
+
+/* ---------- transport ---------- */
+#transportWrap{display:flex; justify-content:center; padding:1.3rem 1rem}
+#transport{
+  width:108px; height:108px; border-radius:50%;
+  border:2px solid var(--edge);
+  background:radial-gradient(circle at 35% 30%, var(--panel-2), var(--panel) 70%);
+  box-shadow:0 4px 18px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05);
+  display:grid; place-items:center; gap:2px;
+  font-size:.78rem; font-weight:700; letter-spacing:.24em; color:var(--dim);
+  transition:border-color .25s, color .25s;
+}
+#transport .glyph{font-size:1.35rem; line-height:1; letter-spacing:0}
+#transport:hover{border-color:var(--amber-dim); color:var(--text)}
+#transport.active{border-color:var(--amber); color:var(--amber)}
+#transport:active{transform:translateY(1px)}
+
+/* ---------- footer ---------- */
+footer{
+  max-width:1080px; margin:0 auto; padding:.4rem 1.1rem 1.4rem;
+  display:flex; flex-wrap:wrap; gap:.4rem 1.3rem; align-items:center;
+  font-size:.7rem; letter-spacing:.1em; color:var(--faint);
+  font-variant-numeric:tabular-nums;
+}
+.dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--faint); margin-right:.35rem; vertical-align:1px}
+.dot.on{background:var(--green)} .dot.off{background:var(--danger)}
+
+/* ---------- settings slide-over ---------- */
+#scrim{position:fixed; inset:0; background:rgba(0,0,0,.55); opacity:0; pointer-events:none; transition:opacity .25s; z-index:30}
+#scrim.show{opacity:1; pointer-events:auto}
+#settings{
+  position:fixed; top:0; right:0; bottom:0; width:min(400px,100%); z-index:40;
+  background:var(--panel); border-left:1px solid var(--edge);
+  transform:translateX(102%); transition:transform .28s ease; overflow-y:auto;
+  padding:1.1rem 1.2rem 2rem;
+}
+#settings.show{transform:none}
+#settings h2{font-size:.8rem; letter-spacing:.24em; text-transform:uppercase; color:var(--dim); display:flex; align-items:center}
+#closeSettings{margin-left:auto; color:var(--dim); font-size:1.2rem; padding:.2rem .5rem}
+#settings fieldset{border:0; border-top:1px solid var(--edge); margin-top:1.1rem; padding-top:.9rem}
+#settings legend{padding-right:.6rem; font-size:.64rem; letter-spacing:.22em; text-transform:uppercase; color:var(--amber); font-weight:600}
+.field{margin:.65rem 0}
+.field label{display:block; font-size:.72rem; color:var(--dim); margin-bottom:.25rem; letter-spacing:.06em}
+.field input[type=text],.field input[type=number],.field select{
+  width:100%; padding:.45rem .6rem; border-radius:6px; font:inherit;
+  background:var(--bg); color:var(--text); border:1px solid var(--edge);
+  font-variant-numeric:tabular-nums;
+}
+.field input:focus,.field select:focus{outline:none; border-color:var(--amber)}
+.field.err input,.field.err select{border-color:var(--danger)}
+.field .ferr{display:none; color:var(--danger); font-size:.7rem; margin-top:.25rem}
+.field.err .ferr{display:block}
+.check{display:flex; gap:.5rem; align-items:center; font-size:.85rem}
+.check input{accent-color:var(--amber)}
+#globalErr{color:var(--danger); font-size:.75rem; margin:.6rem 0; display:none; white-space:pre-wrap}
+#settings .actions{margin-top:1.3rem}
+.btn{
+  padding:.55rem 1.2rem; border-radius:8px; border:1px solid var(--edge);
+  background:var(--panel-2); font-weight:600;
+}
+.btn.primary{border-color:var(--amber); color:var(--amber)}
+.btn.primary:hover{background:rgba(232,161,60,.12)}
+.hint{font-size:.68rem; color:var(--faint); margin-top:.45rem}
+#saveMsg{font-size:.75rem; color:var(--green); margin-top:.5rem; display:none}
+
+/* ---------- calibration modal ---------- */
+#calModal{position:fixed; inset:0; z-index:50; display:none; place-items:center; background:rgba(0,0,0,.6)}
+#calModal.show{display:grid}
+#calBox{width:min(420px, calc(100% - 2rem)); padding:1.4rem 1.4rem 1.2rem;
+  background:var(--panel); border:1px solid var(--edge); border-radius:12px}
+#calBox h3{font-size:.72rem; letter-spacing:.24em; text-transform:uppercase; color:var(--amber); margin-bottom:.8rem}
+#calBox .step-title{font-size:1.1rem; font-weight:600; margin-bottom:.35rem}
+#calBox p{font-size:.85rem; color:var(--dim)}
+.measured{font-size:1.9rem; font-weight:600; color:var(--amber); margin:.8rem 0; font-variant-numeric:tabular-nums}
+.suggest{display:flex; gap:1.6rem; margin:.9rem 0}
+.suggest .num{font-size:1.5rem; font-weight:600; color:var(--amber)}
+#calBox .actions{display:flex; gap:.7rem; justify-content:flex-end; margin-top:1rem}
+.spin{display:inline-block; width:14px; height:14px; border:2px solid var(--faint); border-top-color:var(--amber); border-radius:50%; animation:spin 1s linear infinite; vertical-align:-2px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>needle<span class="drop">drop</span></h1>
+  <span class="tag">vinyl &rarr; sonos</span>
+  <button id="gearBtn" aria-label="Open settings" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2"/>
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09c0 .68.4 1.3 1.03 1.56a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9c.26.63.88 1.03 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.03Z"/>
+    </svg>
+  </button>
+</header>
+
+<main>
+  <section>
+    <div id="banner" class="panel idle" role="region" aria-label="Playback state"></div>
+    <div id="vuWrap" class="panel" style="margin-top:1rem">
+      <div class="lbl"><span>Signal &middot; dBFS</span><span id="vuDb" class="num">&minus;&infin;</span></div>
+      <canvas id="vu" role="img" aria-label="VU level meter with music-on and music-off thresholds"></canvas>
+    </div>
+  </section>
+
+  <section>
+    <div id="zonesWrap" class="panel">
+      <div class="lbl">Zones</div>
+      <div class="master">
+        <span class="lbl" id="masterLbl">Master</span>
+        <input type="range" id="masterVol" min="0" max="100" value="30" aria-labelledby="masterLbl">
+        <span class="num" id="masterVal" style="font-size:.8rem;color:var(--dim);min-width:2.2ch;text-align:right">30</span>
+      </div>
+      <div id="zones"></div>
+    </div>
+    <div id="transportWrap">
+      <button id="transport" aria-label="Start playback">
+        <span class="glyph" aria-hidden="true">&#9654;</span><span id="transportLbl">Start</span>
+      </button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span><span id="devDot" class="dot"></span><span id="devTxt">device</span></span>
+  <span class="num" id="ftListeners">0 listeners</span>
+  <span class="num" id="ftXruns">0 xruns</span>
+  <span>needledrop v0.1.0</span>
+  <span id="demoTag" style="display:none;color:var(--amber)">demo mode</span>
+</footer>
+
+<div id="scrim"></div>
+<aside id="settings" aria-label="Settings" aria-hidden="true">
+  <h2>Settings <button id="closeSettings" aria-label="Close settings">&times;</button></h2>
+  <div id="globalErr" role="alert"></div>
+
+  <fieldset><legend>Audio</legend>
+    <div class="field" data-path="audio.device.usb_id">
+      <label for="f_usb">USB ID (vid:pid)</label>
+      <input type="text" id="f_usb" placeholder="08bb:2902"><div class="ferr"></div>
+    </div>
+    <div class="field" data-path="audio.device.card_name">
+      <label for="f_card">Card name (fallback)</label>
+      <input type="text" id="f_card" placeholder="CODEC"><div class="ferr"></div>
+    </div>
+    <div class="field" data-path="audio.sample_rate">
+      <label for="f_rate">Sample rate</label>
+      <input type="number" id="f_rate" value="44100"><div class="ferr"></div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>Detection</legend>
+    <div class="field" data-path="detect.highpass_hz">
+      <label for="f_hp">High-pass (Hz)</label>
+      <input type="number" id="f_hp" step="1"><div class="ferr"></div>
+    </div>
+    <div class="field" data-path="detect.music_on_db">
+      <label for="f_on">Music-on threshold (dBFS)</label>
+      <input type="number" id="f_on" step="0.5"><div class="ferr"></div>
+    </div>
+    <div class="field" data-path="detect.music_off_db">
+      <label for="f_off">Music-off threshold (dBFS)</label>
+      <input type="number" id="f_off" step="0.5"><div class="ferr"></div>
+    </div>
+    <div class="field" data-path="detect.start_debounce_s">
+      <label for="f_deb">Start debounce (s)</label>
+      <input type="number" id="f_deb" step="0.5"><div class="ferr"></div>
+    </div>
+    <div class="field" data-path="detect.end_of_side_s">
+      <label for="f_eos">End-of-side silence (s)</label>
+      <input type="number" id="f_eos" step="10"><div class="ferr"></div>
+    </div>
+    <button class="btn" id="calOpen" type="button">Calibrate thresholds&hellip;</button>
+  </fieldset>
+
+  <fieldset><legend>Stream</legend>
+    <div class="field" data-path="stream.port">
+      <label for="f_port">Port</label>
+      <input type="number" id="f_port"><div class="ferr"></div>
+    </div>
+    <div class="field" data-path="stream.bitrate">
+      <label for="f_br">Bitrate (kbps)</label>
+      <select id="f_br"><option>128</option><option>192</option><option>256</option><option>320</option></select>
+      <div class="ferr"></div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>Sonos</legend>
+    <div class="field" data-path="sonos.vinyl_zones">
+      <label for="f_zones">Vinyl zones (comma-separated)</label>
+      <input type="text" id="f_zones" placeholder="Living Room, Office"><div class="ferr"></div>
+    </div>
+    <div class="field" data-path="sonos.preferred_coordinator">
+      <label for="f_coord">Preferred coordinator</label>
+      <input type="text" id="f_coord"><div class="ferr"></div>
+    </div>
+    <div class="field" data-path="sonos.master_volume">
+      <label for="f_mvol">Master volume on start (blank = leave alone)</label>
+      <input type="number" id="f_mvol" min="0" max="100"><div class="ferr"></div>
+    </div>
+    <div class="field check" data-path="sonos.dont_interrupt_busy">
+      <input type="checkbox" id="f_busy"><label for="f_busy" style="margin:0">Don&rsquo;t interrupt zones playing something else</label>
+      <div class="ferr"></div>
+    </div>
+  </fieldset>
+
+  <div class="actions">
+    <button class="btn primary" id="saveBtn" type="button">Save changes</button>
+    <div class="hint">Saving restarts needledrop (~2&thinsp;s).</div>
+    <div id="saveMsg">Saved - restarting&hellip;</div>
+  </div>
+</aside>
+
+<div id="calModal" role="dialog" aria-modal="true" aria-labelledby="calTitle">
+  <div id="calBox">
+    <h3 id="calTitle">Calibration</h3>
+    <div id="calBody"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function () {
+  var DEMO = location.search.indexOf("demo=1") !== -1;
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ------------------------------------------------ store */
+  var store = {
+    status: {
+      phase: "IDLE", device_present: false, listeners: 0, xruns: 0,
+      dropped_chunks: 0, zones: [], rms_db: -80,
+      music_on_db: -45, music_off_db: -55, grace_remaining_s: null
+    },
+    cfg: null,                 // last-fetched config (for end_of_side_s + settings)
+    playingSince: null,        // Date.now() when phase entered PLAYING
+    graceBase: null,           // {remaining, at} for local countdown
+    openZones: {},             // name -> true (expanded volume slider)
+    zonesKey: ""               // change detector for zone list re-render
+  };
+  var vu = { target: -80, level: -80, glow: -80, peak: -80, peakAt: 0 };
+
+  /* ------------------------------------------------ API */
+  function api(path, opts) {
+    return fetch(path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        return { ok: r.ok, status: r.status, body: body };
+      });
+    });
+  }
+
+  function applyStatus(s) {
+    var prev = store.status.phase;
+    store.status = s;
+    if (s.phase === "PLAYING" && prev !== "PLAYING") store.playingSince = Date.now();
+    if (s.phase !== "PLAYING" && s.phase !== "GRACE") store.playingSince = null;
+    if (s.phase === "GRACE" && typeof s.grace_remaining_s === "number") {
+      store.graceBase = { remaining: s.grace_remaining_s, at: Date.now() };
+    } else if (s.phase !== "GRACE") {
+      store.graceBase = null;
+    }
+    vu.target = (typeof s.rms_db === "number") ? s.rms_db : -80;
+    render();
+  }
+
+  /* ------------------------------------------------ helpers */
+  function fmtClock(ms) {
+    var t = Math.max(0, Math.floor(ms / 1000));
+    var m = Math.floor(t / 60), s = t % 60;
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+  function graceRemaining() {
+    if (!store.graceBase) return 0;
+    return Math.max(0, store.graceBase.remaining - (Date.now() - store.graceBase.at) / 1000);
+  }
+  function endOfSide() {
+    return (store.cfg && store.cfg.detect && store.cfg.detect.end_of_side_s) || 240;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  /* ------------------------------------------------ render: banner
+     Skeleton is rebuilt only on phase change (so CSS animations keep running);
+     dynamic values (clock, countdown ring) update in place. */
+  var bannerPhase = null;
+  var RING_C = 2 * Math.PI * 26;
+  function renderBanner() {
+    var s = store.status, el = $("banner"), ph = s.phase;
+    if (ph !== bannerPhase) {
+      bannerPhase = ph;
+      el.className = "panel " + ({ IDLE: "idle", SENSING: "sensing", PLAYING: "playing", GRACE: "grace" }[ph] || "idle");
+      var html;
+      if (ph === "PLAYING") {
+        html = '<div class="record" aria-hidden="true"></div>' +
+          '<div><div class="phase">Playing</div>' +
+          '<div class="clock num" id="bClock">0:00</div></div>';
+      } else if (ph === "GRACE") {
+        html = '<svg class="ring" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">' +
+          '<circle class="track" cx="32" cy="32" r="26" stroke-width="4"/>' +
+          '<circle class="arc" id="bArc" cx="32" cy="32" r="26" stroke-width="4" stroke-dasharray="' +
+          RING_C.toFixed(1) + '" stroke-dashoffset="0"/>' +
+          '<text id="bRingNum" x="32" y="37" text-anchor="middle">&nbsp;</text></svg>' +
+          '<div><div class="phase">Side over?</div>' +
+          '<div class="headline">Stopping in <span class="num" id="bGrace"></span></div>' +
+          '<button class="keep" id="keepBtn">Keep playing</button></div>';
+      } else if (ph === "SENSING") {
+        html = '<div><div class="phase">Sensing</div><div class="headline">Signal detected&hellip;</div></div>';
+      } else {
+        html = '<div><div class="phase">Idle</div><div class="headline">Drop the needle&hellip;</div></div>';
+      }
+      el.innerHTML = html;
+    }
+    if (ph === "PLAYING") {
+      $("bClock").textContent = store.playingSince ? fmtClock(Date.now() - store.playingSince) : "0:00";
+    } else if (ph === "GRACE") {
+      var rem = graceRemaining(), total = endOfSide();
+      $("bArc").style.strokeDashoffset = (RING_C * (1 - (total > 0 ? rem / total : 0))).toFixed(1);
+      $("bRingNum").textContent = String(Math.ceil(rem));
+      $("bGrace").textContent = fmtClock(rem * 1000);
+    }
+  }
+
+  /* ------------------------------------------------ render: zones */
+  function zoneChip(z) {
+    var cls = "chip" + (z.grouped ? " grouped" : " dim") + (store.openZones[z.name] ? " open" : "");
+    var badge = "";
+    if (z.skipped_busy) badge = '<span class="badge warn">busy - skipped</span>';
+    else if (z.reachable === false) badge = '<span class="badge warn">unreachable</span>';
+    else if (z.grouped) badge = '<span class="badge" style="border-color:var(--amber-dim);color:var(--amber)">grouped</span>';
+    return '<div class="' + cls + '" data-zone="' + esc(z.name) + '">' +
+      '<button class="head" aria-expanded="' + (!!store.openZones[z.name]) + '" aria-label="' + esc(z.name) + ' volume">' +
+      '<span class="name">' + esc(z.name) + "</span>" + badge +
+      '<span class="vol num">' + z.volume + "</span></button>" +
+      '<div class="slide"><input type="range" min="0" max="100" value="' + z.volume +
+      '" aria-label="' + esc(z.name) + ' volume slider"></div></div>';
+  }
+
+  function renderZones() {
+    /* never rebuild while the user is dragging a slider inside the list */
+    var ae = document.activeElement;
+    if (ae && ae.type === "range" && $("zones").contains(ae)) return;
+    var zs = store.status.zones || [];
+    var key = JSON.stringify(zs) + "|" + JSON.stringify(store.openZones);
+    if (key === store.zonesKey) return;
+    store.zonesKey = key;
+    $("zones").innerHTML = zs.length
+      ? zs.map(zoneChip).join("")
+      : '<div class="hint">No zones reported yet.</div>';
+  }
+
+  /* ------------------------------------------------ render: transport + footer */
+  function renderRest() {
+    var s = store.status;
+    var active = s.phase === "PLAYING" || s.phase === "SENSING" || s.phase === "GRACE";
+    var t = $("transport");
+    t.className = active ? "active" : "";
+    t.setAttribute("aria-label", active ? "Stop playback" : "Start playback");
+    t.querySelector(".glyph").innerHTML = active ? "&#9632;" : "&#9654;";
+    $("transportLbl").textContent = active ? "Stop" : "Start";
+
+    $("devDot").className = "dot " + (s.device_present ? "on" : "off");
+    $("devTxt").textContent = s.device_present ? "device ok" : "device lost";
+    $("ftListeners").textContent = s.listeners + (s.listeners === 1 ? " listener" : " listeners");
+    $("ftXruns").textContent = s.xruns + " xruns";
+  }
+
+  function render() { renderBanner(); renderZones(); renderRest(); }
+
+  /* ------------------------------------------------ VU meter canvas */
+  var canvas = $("vu"), ctx = canvas.getContext("2d");
+  var DB_MIN = -80, DB_MAX = 0;
+
+  function sizeCanvas() {
+    var dpr = window.devicePixelRatio || 1;
+    var w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", sizeCanvas);
+
+  function css(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function drawVU() {
+    var w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w) return;
+    var padL = 10, padR = 10, x0 = padL, x1 = w - padR;
+    var scaleY = h - 18, barY = 34, barH = 16;
+    var amber = css("--amber"), dim = css("--dim"), faint = css("--faint"), edge = css("--edge");
+    function X(db) {
+      var t = (Math.min(DB_MAX, Math.max(DB_MIN, db)) - DB_MIN) / (DB_MAX - DB_MIN);
+      return x0 + t * (x1 - x0);
+    }
+    ctx.clearRect(0, 0, w, h);
+
+    /* scale ticks */
+    ctx.strokeStyle = edge; ctx.fillStyle = faint;
+    ctx.font = "9px system-ui, sans-serif"; ctx.textAlign = "center";
+    ctx.lineWidth = 1;
+    for (var db = DB_MIN; db <= DB_MAX; db += 5) {
+      var major = db % 20 === 0, x = Math.round(X(db)) + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x, scaleY);
+      ctx.lineTo(x, scaleY + (major ? 8 : 4));
+      ctx.stroke();
+      if (major) ctx.fillText(db === 0 ? "0" : String(db), x, scaleY + 17);
+    }
+    /* track */
+    ctx.fillStyle = "rgba(0,0,0,.28)";
+    ctx.fillRect(x0, barY, x1 - x0, barH);
+
+    /* afterglow then live bar */
+    var lx = X(vu.level), gx = X(vu.glow);
+    if (gx > lx) {
+      ctx.fillStyle = "rgba(232,161,60,.18)";
+      ctx.fillRect(lx, barY, gx - lx, barH);
+    }
+    ctx.fillStyle = amber;
+    ctx.fillRect(x0, barY, Math.max(0, lx - x0), barH);
+
+    /* peak-hold tick */
+    if (vu.peak > DB_MIN + 0.5) {
+      var px = Math.round(X(vu.peak));
+      ctx.fillStyle = "rgba(255,236,200,.9)";
+      ctx.fillRect(px - 1, barY - 2, 2, barH + 4);
+    }
+
+    /* threshold calibration marks */
+    function mark(db, label, dashed, color) {
+      var x = Math.round(X(db)) + 0.5;
+      ctx.strokeStyle = color; ctx.lineWidth = 1;
+      ctx.setLineDash(dashed ? [4, 3] : []);
+      ctx.beginPath(); ctx.moveTo(x, 14); ctx.lineTo(x, scaleY); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      ctx.font = "600 9px system-ui, sans-serif";
+      ctx.fillText(label, x, 10);
+    }
+    mark(store.status.music_on_db, "ON " + store.status.music_on_db, false, amber);
+    mark(store.status.music_off_db, "OFF " + store.status.music_off_db, true, dim);
+  }
+
+  /* 20 fps animation: ease level, decay glow + peak */
+  setInterval(function () {
+    vu.level += (vu.target - vu.level) * 0.45;
+    vu.glow = Math.max(vu.glow - 1.4, vu.level);       /* slow decay afterglow */
+    if (vu.level > vu.peak) { vu.peak = vu.level; vu.peakAt = Date.now(); }
+    else if (Date.now() - vu.peakAt > 1500) vu.peak = Math.max(DB_MIN, vu.peak - 2.5);
+    $("vuDb").innerHTML = vu.target <= -79.5 ? "&minus;&infin;" : vu.target.toFixed(1);
+    drawVU();
+  }, 50);
+
+  /* ------------------------------------------------ live wiring */
+  var pollTimer = null, ws = null, wsRetry = 1000;
+
+  function poll() {
+    api("/api/status").then(function (r) { if (r.ok) applyStatus(r.body); }).catch(function () {});
+  }
+  function connectWS() {
+    var proto = location.protocol === "https:" ? "wss://" : "ws://";
+    try { ws = new WebSocket(proto + location.host + "/ws"); } catch (e) { return; }
+    ws.onmessage = function (ev) {
+      var m;
+      try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m.type === "vu") vu.target = (typeof m.db === "number") ? m.db : -80;
+      else if (m.type === "state") applyStatus(m);
+    };
+    ws.onopen = function () { wsRetry = 1000; };
+    ws.onclose = function () {
+      ws = null;
+      setTimeout(connectWS, wsRetry);
+      wsRetry = Math.min(wsRetry * 2, 15000);
+    };
+  }
+  function loadConfig() {
+    return api("/api/config").then(function (r) {
+      if (r.ok) { store.cfg = r.body; fillSettings(r.body); }
+    }).catch(function () {});
+  }
+
+  /* ------------------------------------------------ transport / keep-playing */
+  $("transport").addEventListener("click", function () {
+    var s = store.status;
+    var active = s.phase === "PLAYING" || s.phase === "SENSING" || s.phase === "GRACE";
+    if (DEMO) { demoManual(active ? "stop" : "start"); return; }
+    api(active ? "/api/stop" : "/api/start", { method: "POST" }).then(poll).catch(function () {});
+  });
+  $("banner").addEventListener("click", function (e) {
+    if (!e.target.closest("#keepBtn")) return;
+    if (DEMO) { store.graceBase = { remaining: endOfSide(), at: Date.now() }; render(); return; }
+    api("/api/keep-playing", { method: "POST" }).then(poll).catch(function () {});
+  });
+
+  /* ------------------------------------------------ zone chips + volume */
+  var volTimers = {};
+  function sendVolume(zone, volume) {
+    clearTimeout(volTimers[zone]);
+    volTimers[zone] = setTimeout(function () {
+      if (DEMO) return;
+      /* POST /api/volume */
+      api("/api/volume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zone: zone, volume: volume })
+      }).catch(function () {});
+    }, 250);
+  }
+  function setLocalVolume(name, v) {
+    (store.status.zones || []).forEach(function (z) { if (z.name === name) z.volume = v; });
+    var chip = document.querySelector('.chip[data-zone="' + name.replace(/"/g, '\\"') + '"]');
+    if (chip) chip.querySelector(".vol").textContent = v;
+    sendVolume(name, v);
+  }
+  $("zones").addEventListener("click", function (e) {
+    var head = e.target.closest(".head");
+    if (!head) return;
+    var name = head.parentElement.getAttribute("data-zone");
+    if (store.openZones[name]) delete store.openZones[name];
+    else store.openZones[name] = true;
+    store.zonesKey = ""; renderZones();
+  });
+  $("zones").addEventListener("input", function (e) {
+    if (e.target.type !== "range") return;
+    var name = e.target.closest(".chip").getAttribute("data-zone");
+    setLocalVolume(name, parseInt(e.target.value, 10));
+  });
+  $("masterVol").addEventListener("input", function () {
+    var v = parseInt(this.value, 10);
+    $("masterVal").textContent = v;
+    (store.status.zones || []).forEach(function (z) {
+      if (z.grouped) setLocalVolume(z.name, v);
+    });
+    store.zonesKey = ""; renderZones();
+  });
+
+  /* ------------------------------------------------ settings panel */
+  function openSettings(show) {
+    $("settings").classList.toggle("show", show);
+    $("scrim").classList.toggle("show", show);
+    $("settings").setAttribute("aria-hidden", String(!show));
+    $("gearBtn").setAttribute("aria-expanded", String(show));
+    if (show && !DEMO) loadConfig();
+  }
+  $("gearBtn").addEventListener("click", function () { openSettings(true); });
+  $("closeSettings").addEventListener("click", function () { openSettings(false); });
+  $("scrim").addEventListener("click", function () { openSettings(false); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if ($("calModal").classList.contains("show")) closeCal();
+    else openSettings(false);
+  });
+
+  function fillSettings(c) {
+    $("f_usb").value = c.audio.device.usb_id || "";
+    $("f_card").value = c.audio.device.card_name || "";
+    $("f_rate").value = c.audio.sample_rate;
+    $("f_hp").value = c.detect.highpass_hz;
+    $("f_on").value = c.detect.music_on_db;
+    $("f_off").value = c.detect.music_off_db;
+    $("f_deb").value = c.detect.start_debounce_s;
+    $("f_eos").value = c.detect.end_of_side_s;
+    $("f_port").value = c.stream.port;
+    $("f_br").value = String(c.stream.bitrate);
+    $("f_zones").value = (c.sonos.vinyl_zones || []).join(", ");
+    $("f_coord").value = c.sonos.preferred_coordinator || "";
+    $("f_mvol").value = c.sonos.master_volume === null || c.sonos.master_volume === undefined
+      ? "" : c.sonos.master_volume;
+    $("f_busy").checked = !!c.sonos.dont_interrupt_busy;
+  }
+
+  function collectConfig() {
+    var mvol = $("f_mvol").value.trim();
+    return {
+      audio: {
+        device: { usb_id: $("f_usb").value.trim(), card_name: $("f_card").value.trim() },
+        sample_rate: parseInt($("f_rate").value, 10)
+      },
+      detect: {
+        highpass_hz: parseFloat($("f_hp").value),
+        music_on_db: parseFloat($("f_on").value),
+        music_off_db: parseFloat($("f_off").value),
+        start_debounce_s: parseFloat($("f_deb").value),
+        end_of_side_s: parseFloat($("f_eos").value)
+      },
+      stream: {
+        port: parseInt($("f_port").value, 10),
+        bitrate: parseInt($("f_br").value, 10)
+      },
+      sonos: {
+        vinyl_zones: $("f_zones").value.split(",").map(function (s) { return s.trim(); })
+          .filter(function (s) { return s.length; }),
+        preferred_coordinator: $("f_coord").value.trim(),
+        dont_interrupt_busy: $("f_busy").checked,
+        master_volume: mvol === "" ? null : parseInt(mvol, 10)
+      }
+    };
+  }
+
+  function clearErrors() {
+    $("globalErr").style.display = "none";
+    var fields = document.querySelectorAll(".field.err");
+    for (var i = 0; i < fields.length; i++) fields[i].classList.remove("err");
+  }
+  function showErrors(message) {
+    /* server error string joins problems with "; " and carries dotted field paths */
+    var parts = String(message || "invalid config").split("; ");
+    var unmatched = [];
+    parts.forEach(function (p) {
+      var hit = null;
+      var fields = document.querySelectorAll(".field[data-path]");
+      for (var i = 0; i < fields.length; i++) {
+        if (p.indexOf(fields[i].getAttribute("data-path")) !== -1) { hit = fields[i]; break; }
+      }
+      if (hit) {
+        hit.classList.add("err");
+        hit.querySelector(".ferr").textContent = p;
+      } else unmatched.push(p);
+    });
+    if (unmatched.length) {
+      $("globalErr").textContent = unmatched.join("\n");
+      $("globalErr").style.display = "block";
+    }
+  }
+
+  $("saveBtn").addEventListener("click", function () {
+    clearErrors();
+    $("saveMsg").style.display = "none";
+    var cfg = collectConfig();
+    if (DEMO) {
+      store.cfg = cfg;
+      store.status.music_on_db = cfg.detect.music_on_db;
+      store.status.music_off_db = cfg.detect.music_off_db;
+      $("saveMsg").style.display = "block";
+      return;
+    }
+    api("/api/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg)
+    }).then(function (r) {
+      if (r.ok) {
+        store.cfg = cfg;
+        store.status.music_on_db = cfg.detect.music_on_db;
+        store.status.music_off_db = cfg.detect.music_off_db;
+        $("saveMsg").style.display = "block";
+        setTimeout(function () { $("saveMsg").style.display = "none"; }, 5000);
+      } else showErrors(r.body && r.body.error);
+    }).catch(function () { showErrors("could not reach needledrop"); });
+  });
+
+  /* ------------------------------------------------ calibration wizard */
+  var cal = { step: 0, floor: null, groove: null };
+
+  function closeCal() { $("calModal").classList.remove("show"); }
+  $("calOpen").addEventListener("click", function () {
+    cal = { step: 0, floor: null, groove: null };
+    renderCal();
+    $("calModal").classList.add("show");
+  });
+  $("calModal").addEventListener("click", function (e) {
+    if (e.target === $("calModal")) closeCal();
+  });
+
+  function calSuggest() {
+    var base = Math.max(cal.floor, cal.groove !== null ? cal.groove : cal.floor);
+    var off = Math.min(-20, Math.max(-75, base + 8));
+    var on = Math.min(-15, Math.max(off + 5, base + 15));
+    return { on: Math.round(on * 2) / 2, off: Math.round(off * 2) / 2 };
+  }
+
+  function renderCal() {
+    var b = $("calBody"), html = "";
+    if (cal.step === 0) {
+      html = '<div class="step-title">Step 1 of 3 - Lift the needle</div>' +
+        "<p>Raise the tonearm so we can measure the system noise floor. Measuring takes about 10 seconds.</p>" +
+        (cal.floor !== null ? '<div class="measured num">' + cal.floor.toFixed(1) + " dBFS</div>" : "") +
+        '<div class="actions"><button class="btn" data-cal="cancel">Cancel</button>' +
+        (cal.floor === null
+          ? '<button class="btn primary" data-cal="measure-floor">Measure floor</button>'
+          : '<button class="btn primary" data-cal="next">Next</button>') + "</div>";
+    } else if (cal.step === 1) {
+      html = '<div class="step-title">Step 2 of 3 - Drop the needle on a silent groove</div>' +
+        "<p>Use the run-in or run-out groove of a record, platter spinning. This measures groove noise.</p>" +
+        (cal.groove !== null ? '<div class="measured num">' + cal.groove.toFixed(1) + " dBFS</div>" : "") +
+        '<div class="actions"><button class="btn" data-cal="cancel">Cancel</button>' +
+        (cal.groove === null
+          ? '<button class="btn primary" data-cal="measure-groove">Measure groove</button>'
+          : '<button class="btn primary" data-cal="next">Next</button>') + "</div>";
+    } else {
+      var s = calSuggest();
+      html = '<div class="step-title">Step 3 of 3 - Suggested thresholds</div>' +
+        "<p>Floor " + cal.floor.toFixed(1) + " dBFS &middot; groove " +
+        (cal.groove !== null ? cal.groove.toFixed(1) : "-") + " dBFS</p>" +
+        '<div class="suggest">' +
+        '<div><div class="lbl">music-off</div><div class="num">' + s.off.toFixed(1) + "</div></div>" +
+        '<div><div class="lbl">music-on</div><div class="num">' + s.on.toFixed(1) + "</div></div>" +
+        "</div>" +
+        '<div class="actions"><button class="btn" data-cal="cancel">Cancel</button>' +
+        '<button class="btn primary" data-cal="apply">Apply thresholds</button></div>';
+    }
+    b.innerHTML = html;
+  }
+
+  function measure(phase) {
+    var btn = $("calBody").querySelector("[data-cal^=measure]");
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Measuring&hellip;'; }
+    var done = function (db) {
+      if (phase === "floor") cal.floor = db; else cal.groove = db;
+      renderCal();
+    };
+    if (DEMO) {
+      setTimeout(function () { done(phase === "floor" ? -71.3 : -58.6); }, 1200);
+      return;
+    }
+    api("/api/calibrate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phase: phase })
+    }).then(function (r) {
+      if (r.ok) done(r.body.measured_db);
+      else { renderCal(); $("globalErr").textContent = (r.body && r.body.error) || "calibration failed"; $("globalErr").style.display = "block"; }
+    }).catch(function () { renderCal(); });
+  }
+
+  $("calBody").addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-cal]");
+    if (!btn) return;
+    var act = btn.getAttribute("data-cal");
+    if (act === "cancel") closeCal();
+    else if (act === "measure-floor") measure("floor");
+    else if (act === "measure-groove") measure("groove");
+    else if (act === "next") { cal.step += 1; renderCal(); }
+    else if (act === "apply") {
+      var s = calSuggest();
+      $("f_on").value = s.on;
+      $("f_off").value = s.off;
+      closeCal();
+      $("saveBtn").click();   /* PUT full config with new thresholds */
+    }
+  });
+
+  /* ------------------------------------------------ demo mode */
+  var DEMO_CFG = {
+    audio: { device: { usb_id: "08bb:2902", card_name: "CODEC" }, sample_rate: 44100 },
+    detect: { highpass_hz: 40, music_on_db: -45, music_off_db: -55, start_debounce_s: 2, end_of_side_s: 240 },
+    stream: { port: 8341, bitrate: 320 },
+    sonos: {
+      vinyl_zones: ["Living Room", "Dining Room", "Office", "Playroom"],
+      preferred_coordinator: "Living Room", dont_interrupt_busy: true, master_volume: null
+    }
+  };
+  function demoZones(active) {
+    return [
+      { name: "Living Room", grouped: active, skipped_busy: false, volume: 34, reachable: true },
+      { name: "Dining Room", grouped: active, skipped_busy: false, volume: 28, reachable: true },
+      { name: "Office", grouped: false, skipped_busy: active, volume: 22, reachable: true },
+      { name: "Playroom", grouped: false, skipped_busy: false, volume: 15, reachable: true }
+    ];
+  }
+  var demo = { t: 0, phase: "IDLE", grace: 240 };
+  function demoManual(action) {
+    if (action === "start") { demo.phase = "PLAYING"; demo.t = 0; }
+    else { demo.phase = "IDLE"; demo.t = 0; }
+    demoPush();
+  }
+  function demoPush() {
+    var active = demo.phase === "PLAYING" || demo.phase === "GRACE";
+    var db;
+    if (demo.phase === "PLAYING") db = -30 + Math.sin(demo.t / 1.1) * 6 + (Math.random() - 0.5) * 7;
+    else if (demo.phase === "SENSING") db = -42 + Math.random() * 6;
+    else if (demo.phase === "GRACE") db = -66 + Math.random() * 4;
+    else db = -74 + Math.random() * 3;
+    applyStatus({
+      phase: demo.phase, device_present: true, listeners: active ? 2 : 0,
+      xruns: 0, dropped_chunks: 0, zones: demoZones(active),
+      rms_db: Math.round(db * 10) / 10,
+      music_on_db: DEMO_CFG.detect.music_on_db, music_off_db: DEMO_CFG.detect.music_off_db,
+      grace_remaining_s: demo.phase === "GRACE" ? demo.grace : null
+    });
+  }
+  function demoTick() {
+    demo.t += 0.25;
+    if (demo.phase === "IDLE" && demo.t > 4) { demo.phase = "SENSING"; demo.t = 0; }
+    else if (demo.phase === "SENSING" && demo.t > 2.5) { demo.phase = "PLAYING"; demo.t = 0; }
+    else if (demo.phase === "PLAYING" && demo.t > 14) { demo.phase = "GRACE"; demo.grace = 237; demo.t = 0; }
+    else if (demo.phase === "GRACE") {
+      demo.grace -= 0.25;
+      if (demo.t > 11) { demo.phase = "IDLE"; demo.t = 0; demo.grace = 240; }
+    }
+    demoPush();
+  }
+
+  /* ------------------------------------------------ boot */
+  sizeCanvas();
+  setInterval(render, 1000);          /* elapsed clock + grace countdown tick */
+  if (DEMO) {
+    $("demoTag").style.display = "inline";
+    store.cfg = DEMO_CFG;
+    fillSettings(DEMO_CFG);
+    demoPush();
+    setInterval(demoTick, 250);
+  } else {
+    poll();
+    loadConfig();
+    connectWS();
+    pollTimer = setInterval(poll, 5000);
+    void pollTimer;
+  }
+})();
+</script>
+</body>
+</html>
