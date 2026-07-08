@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "needledrop"
-version = "0.1.0"
+version = "0.1.1"
 description = "Drop the needle - your Sonos speakers play your turntable, house-wide."
 readme = "README.md"
 license = "MIT"
